@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+import logging
+from typing import Optional, List
+
+from telegram import Update, User
+from telegram.ext import ContextTypes
+from telegram.constants import ChatType
+
+from app.core.config import AppConfig
+from app.core.models import UserIdentity, CircleMessage
+from app.core.scoring import compute_reaction_delta
+from app.storage.repo import Repository
+from app.bot.formatting import format_top_message
+
+logger = logging.getLogger(__name__)
+
+
+def _display_name(u: User) -> str:
+    name = (u.full_name or "").strip()
+    return name if name else (u.first_name or "User")
+
+
+def _emoji_key(reaction_obj) -> str:
+    """
+    PTB reaction objects:
+      - ReactionTypeEmoji: has .emoji
+      - ReactionTypeCustomEmoji: has .custom_emoji_id
+    We normalize to:
+      - unicode emoji -> "🔥"
+      - custom -> "custom:<id>"
+    """
+    if hasattr(reaction_obj, "emoji") and reaction_obj.emoji:
+        return str(reaction_obj.emoji)
+    if hasattr(reaction_obj, "custom_emoji_id") and reaction_obj.custom_emoji_id:
+        return f"custom:{reaction_obj.custom_emoji_id}"
+    return "unknown"
+
+
+async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    if not update.effective_chat:
+        return
+    chat_id = update.effective_chat.id
+    repo.ensure_chat_state(chat_id=chat_id)
+
+    rows = repo.get_top(chat_id=chat_id, limit=cfg.top_limit)
+    text = format_top_message(rows)
+    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+
+
+async def cmd_me(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    if not update.effective_chat or not update.effective_user:
+        return
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+
+    stats = repo.get_user_stats(chat_id=chat_id, user_id=user.id)
+    if not stats:
+        await update.effective_message.reply_text(
+            "No stats yet. Record a circle (video note) to join 🎤",
+            parse_mode=cfg.parse_mode,
+        )
+        return
+
+    label = stats.display_name + (f" (@{stats.username})" if stats.username else "")
+    text = (
+        f"👤 <b>{label}</b>\n"
+        f"Points: <b>{stats.points}</b>\n"
+        f"Circles: 🎥 {stats.circles}\n"
+        f"Reactions: ❤️ {stats.reactions}"
+    )
+    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+
+
+async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, cfg: AppConfig) -> None:
+    text = (
+        "📜 <b>Rules</b>\n"
+        f"Circle (video note): +{cfg.points_per_circle} point(s)\n"
+        f"Reaction on a circle: +{cfg.points_per_reaction} point(s)\n"
+        f"Auto rating interval: {cfg.rating_interval_sec} sec\n"
+        f"Zero criteria: {cfg.zero_criteria}\n"
+        f"Zero ping limit: {cfg.zero_ping_limit}\n"
+        f"Top limit: {cfg.top_limit}"
+    )
+    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+
+
+async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    """
+    Handles circles (video_note).
+    """
+    msg = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
+    if not msg or not chat or not user:
+        return
+
+    # Only groups/supergroups (optional hard rule)
+    if chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        return
+
+    if msg.video_note is None:
+        return
+
+    repo.ensure_chat_state(chat_id=chat.id)
+
+    identity = UserIdentity(
+        chat_id=chat.id,
+        user_id=user.id,
+        username=user.username,
+        display_name=_display_name(user),
+    )
+    repo.upsert_user(identity)
+
+    created_ts = int(msg.date.timestamp()) if msg.date else 0
+    circle = CircleMessage(
+        chat_id=chat.id,
+        message_id=msg.message_id,
+        author_id=user.id,
+        created_at_ts=created_ts,
+    )
+
+    inserted = repo.insert_circle_message(circle)
+    if not inserted:
+        # already processed (idempotent)
+        return
+
+    repo.add_circle_points(chat_id=chat.id, user_id=user.id, points=cfg.points_per_circle)
+    repo.set_last_circle_ts(chat_id=chat.id, ts=created_ts)
+
+    logger.info("Circle recorded chat=%s msg=%s author=%s", chat.id, msg.message_id, user.id)
+
+
+async def on_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    """
+    Handles reaction updates on circle messages using reactions_log for idempotency.
+    """
+    mr = update.message_reaction
+    if not mr:
+        return
+
+    chat = mr.chat
+    if not chat:
+        return
+
+    chat_id = chat.id
+    message_id = mr.message_id
+
+    repo.ensure_chat_state(chat_id=chat_id)
+
+    author_id = repo.try_get_circle_author_id(chat_id=chat_id, message_id=message_id)
+    if author_id is None:
+        return  # not a circle message we track
+
+    reactor = mr.user
+    if not reactor:
+        return
+
+    # Normalize reaction sets
+    old_set: List[str] = [_emoji_key(x.type) for x in (mr.old_reaction or [])]
+    new_set: List[str] = [_emoji_key(x.type) for x in (mr.new_reaction or [])]
+
+    delta = compute_reaction_delta(old_set=old_set, new_set=new_set)
+
+    # Ensure author exists in users (can be missing if DB was reset mid-chat)
+    # We cannot reliably fetch author identity here from update, so just ensure row exists if present.
+    # (If missing, points update will affect 0 rows; acceptable, but you can add a "create placeholder" policy.)
+    for emoji in delta.added:
+        if repo.try_insert_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji):
+            repo.add_reaction_points(chat_id=chat_id, user_id=author_id, points=cfg.points_per_reaction)
+
+    for emoji in delta.removed:
+        if repo.try_delete_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji):
+            repo.add_reaction_points(chat_id=chat_id, user_id=author_id, points=-cfg.points_per_reaction)
+
+    logger.info(
+        "Reaction delta chat=%s msg=%s reactor=%s author=%s added=%s removed=%s",
+        chat_id, message_id, reactor.id, author_id, list(delta.added), list(delta.removed),
+    )
