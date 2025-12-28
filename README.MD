@@ -13,6 +13,7 @@ A Telegram group/supergroup bot that:
 - ✅ Commands: `/top`, `/me`, `/rules`
 - ✅ Scheduler: every `RATING_INTERVAL_SEC`, only posts if `last_circle_ts > last_rating_ts`
 - ✅ Storage: SQLite (default), repository interface allows swapping to PostgreSQL later
+- ✅ Storage: SQLite (default) and PostgreSQL (via `DB_URL`) with automatic selection
 
 ---
 
@@ -20,6 +21,9 @@ A Telegram group/supergroup bot that:
 - Python **3.10+** (recommended 3.12)
 - A Telegram bot token from **@BotFather**
 - The bot must be added to a **Group/Supergroup** and made **Admin** (required to receive reaction updates)
+ - The bot must be added to a **Group/Supergroup** and made **Admin** (required to receive reaction updates)
+ - PostgreSQL is optional for production use when `DB_URL` points to a Postgres server
+ - If using PostgreSQL, ensure `psycopg[binary]>=3.1` is installed (add to `requirements.txt` or install separately)
 
 ---
 
@@ -57,11 +61,19 @@ source .venv/bin/activate
 ```
 
 ### 2) Install dependencies
-Create requirements.txt in repo root:
+Create `requirements.txt` in repo root (example):
+```
 python-telegram-bot>=21.0
+# optional (PostgreSQL): psycopg[binary]>=3.1
+```
 
-Install:
+Install runtime dependencies:
+
+```bash
 pip install -r requirements.txt
+# If you plan to use PostgreSQL and `psycopg` isn't already in requirements:
+pip install "psycopg[binary]>=3.1"
+```
 
 ### 3) Create .env
 Copy example:
@@ -69,7 +81,10 @@ cp .env.example .env
 .env.example (repo root):
 
 BOT_TOKEN=PUT_YOUR_TOKEN_HERE
+# For SQLite (default):
 DB_URL=sqlite:///data/bot.db
+# For PostgreSQL (example):
+# DB_URL=postgresql://postgres:password@localhost:5432/freestyle_bot
 
 POINTS_PER_CIRCLE=1
 POINTS_PER_REACTION=1
@@ -196,5 +211,5 @@ docker compose up --build
 ⸻
 
 ## Notes
-	•	Current implementation supports SQLite only via DB_URL=sqlite:///....
-	•	pg_repo.py is a stub; keep the Repository interface unchanged when implementing PostgreSQL.
+ 	•	Storage: the app supports SQLite by default and PostgreSQL via `DB_URL` (the code includes `pg_repo.py`).
+ 	•	When `DB_URL` points to Postgres the `PostgresRepository` implementation (requires `psycopg`) is used automatically.
