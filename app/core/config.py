@@ -29,6 +29,8 @@ class AppConfig:
 
     parse_mode: str = "HTML"
 
+    admin_chat_id: int = 0  # Optional: set to send greeting to this chat on startup
+
     @staticmethod
     def from_env() -> "AppConfig":
         bot_token = os.getenv("BOT_TOKEN", "").strip()
@@ -55,4 +57,5 @@ class AppConfig:
             zero_ping_limit=_int("ZERO_PING_LIMIT", 10),
             zero_criteria=zero_criteria,
             top_limit=_int("TOP_LIMIT", 10),
+            admin_chat_id=_int("ADMIN_CHAT_ID", 0),
         )

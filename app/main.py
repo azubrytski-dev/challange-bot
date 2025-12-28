@@ -14,7 +14,8 @@ from telegram.ext import (
 
 from app.core.config import AppConfig
 from app.storage.sqlite_repo import SQLiteRepository
-from app.bot.handlers import cmd_top, cmd_me, cmd_rules, on_message, on_reaction, cmd_enable_ratings, cmd_disable_ratings
+from app.storage.pg_repo import PostgresRepository
+from app.bot.handlers import cmd_top, cmd_me, cmd_rules, on_message, on_reaction, cmd_enable_ratings, cmd_disable_ratings, send_greeting
 from app.bot.scheduler import publish_rating_job
 
 
@@ -32,7 +33,30 @@ def _sqlite_path_from_db_url(db_url: str) -> str:
     return db_url.replace("sqlite:///", "", 1)
 
 
+def _is_postgres(db_url: str) -> bool:
+    """Check if DB_URL is a PostgreSQL connection string."""
+    return db_url.startswith("postgresql://") or db_url.startswith("postgres://")
+
+
+def _build_repo(cfg: AppConfig):
+    """Build the appropriate repository based on DB_URL."""
+    if _is_postgres(cfg.db_url):
+        logger.info("Using PostgreSQL repository: %s", cfg.db_url)
+        return PostgresRepository(
+            dsn=cfg.db_url,
+            migrations_sql_path="app/storage/mg_postgre_init.sql",
+        )
+
+    # Default to SQLite
+    logger.info("Using SQLite repository: %s", cfg.db_url)
+    db_path = _sqlite_path_from_db_url(cfg.db_url)
+    return SQLiteRepository(db_path=db_path, migrations_sql_path="app/storage/mg_sqllite_init.sql")
+
+
 async def _post_init(app: Application, *, repo: SQLiteRepository, cfg: AppConfig) -> None:
+    # Send greeting message on startup
+    await send_greeting(app, cfg)
+
     # Schedule periodic rating publishing using PTB JobQueue (no create_task warning)
     app.job_queue.run_repeating(
         callback=publish_rating_job,
@@ -45,8 +69,7 @@ async def _post_init(app: Application, *, repo: SQLiteRepository, cfg: AppConfig
 
 
 def build_app(*, cfg: AppConfig) -> Application:
-    db_path = _sqlite_path_from_db_url(cfg.db_url)
-    repo = SQLiteRepository(db_path=db_path, migrations_sql_path="app/storage/migrations_v2.sql")
+    repo = _build_repo(cfg)
 
     application = Application.builder().token(cfg.bot_token).build()
 

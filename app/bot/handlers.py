@@ -118,6 +118,29 @@ async def cmd_disable_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.effective_message.reply_text("🛑 Auto рейтинги выключены.", parse_mode=cfg.parse_mode)
 
 
+async def send_greeting(app, cfg: AppConfig) -> None:
+    """Send a greeting message to admin chat on application startup."""
+    if not cfg.admin_chat_id:
+        logger.info("✅ Application started. (No ADMIN_CHAT_ID configured.)")
+        return
+
+    try:
+        greeting_text = (
+            "🤖 <b>Circles Ranking Bot</b>\n"
+            "✅ Application started successfully!\n\n"
+            "📝 Available commands:\n"
+            "  /top — top users\n"
+            "  /me — your stats\n"
+            "  /rules — config & rules\n"
+            "  /enable_ratings — start auto ratings (admins)\n"
+            "  /disable_ratings — stop auto ratings (admins)"
+        )
+        await app.bot.send_message(chat_id=cfg.admin_chat_id, text=greeting_text, parse_mode=cfg.parse_mode)
+        logger.info("✅ Application started. Greeting sent to admin chat %s.", cfg.admin_chat_id)
+    except Exception as e:
+        logger.warning("Failed to send greeting to admin chat %s: %s", cfg.admin_chat_id, e)
+
+
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
     """
     Handles circles (video_note).
