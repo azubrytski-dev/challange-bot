@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from typing import Optional, Sequence, List
+import logging
 
 from app.core.models import UserIdentity, UserStats, TopRow, ChatState, CircleMessage
 from app.storage.repo import Repository
+
+logger = logging.getLogger(__name__)
 
 
 class PostgresRepository(Repository):
@@ -104,6 +107,21 @@ class PostgresRepository(Repository):
                     """,
                     (identity.chat_id, identity.user_id, identity.username, identity.display_name),
                 )
+                logger.info("upsert_user executed: chat=%s user=%s rows_affected=%s", 
+                            identity.chat_id, identity.user_id, cur.rowcount)
+                
+                # Verify the user exists after upsert
+                cur.execute(
+                    "SELECT chat_id, user_id, points FROM users WHERE chat_id=%s AND user_id=%s",
+                    (identity.chat_id, identity.user_id),
+                )
+                row = cur.fetchone()
+                if row:
+                    logger.info("User verified in DB: chat=%s user=%s current_points=%s", 
+                               identity.chat_id, identity.user_id, row["points"])
+                else:
+                    logger.error("User NOT found in DB after upsert! chat=%s user=%s", 
+                                identity.chat_id, identity.user_id)
             con.commit()
 
     def get_user_stats(self, *, chat_id: int, user_id: int) -> Optional[UserStats]:
@@ -128,6 +146,9 @@ class PostgresRepository(Repository):
                     "UPDATE users SET circles=circles+1, points=points+%s WHERE chat_id=%s AND user_id=%s",
                     (points, chat_id, user_id),
                 )
+                rows_updated = cur.rowcount
+                logger.info("add_circle_points: chat=%s user=%s points=%s rows_updated=%s", 
+                           chat_id, user_id, points, rows_updated)
             con.commit()
 
     def add_reaction_points(self, *, chat_id: int, user_id: int, points: int) -> None:
@@ -139,6 +160,9 @@ class PostgresRepository(Repository):
                     "UPDATE users SET reactions=reactions+%s, points=points+%s WHERE chat_id=%s AND user_id=%s",
                     (delta, points, chat_id, user_id),
                 )
+                rows_updated = cur.rowcount
+                logger.info("add_reaction_points: chat=%s user=%s points=%s delta=%s rows_updated=%s", 
+                           chat_id, user_id, points, delta, rows_updated)
             con.commit()
 
     # --- circles ---
@@ -150,20 +174,32 @@ class PostgresRepository(Repository):
                     INSERT INTO circle_messages(chat_id,message_id,author_id,created_at_ts)
                     VALUES(%s,%s,%s,%s)
                     ON CONFLICT (chat_id,message_id) DO NOTHING
+                    RETURNING 1
                     """,
                     (circle.chat_id, circle.message_id, circle.author_id, circle.created_at_ts),
                 )
+                result = cur.fetchone() is not None
+                logger.info(
+                    "insert_circle_message: chat=%s msg=%s author=%s inserted=%s",
+                    circle.chat_id,
+                    circle.message_id,
+                    circle.author_id,
+                    result,
+                )
             con.commit()
-            return cur.rowcount == 1
+            return result
 
     def try_get_circle_author_id(self, *, chat_id: int, message_id: int) -> Optional[int]:
         with self._connect() as con:
             with con.cursor() as cur:
-                row = cur.execute(
+                cur.execute(
                     "SELECT author_id FROM circle_messages WHERE chat_id=%s AND message_id=%s",
                     (chat_id, message_id),
-                ).fetchone()
-        return int(row["author_id"]) if row else None
+                )
+                row = cur.fetchone()
+        author_id = int(row["author_id"]) if row else None
+        logger.info("try_get_circle_author_id: chat=%s msg=%s found_author=%s", chat_id, message_id, author_id)
+        return author_id
 
     # --- reactions log ---
     def try_insert_reaction(self, *, chat_id: int, message_id: int, reactor_id: int, emoji: str) -> bool:
@@ -174,11 +210,13 @@ class PostgresRepository(Repository):
                     INSERT INTO reactions_log(chat_id,message_id,reactor_id,emoji)
                     VALUES(%s,%s,%s,%s)
                     ON CONFLICT (chat_id,message_id,reactor_id,emoji) DO NOTHING
+                    RETURNING 1
                     """,
                     (chat_id, message_id, reactor_id, emoji),
                 )
+                inserted = cur.fetchone() is not None
             con.commit()
-            return cur.rowcount == 1
+            return inserted
 
     def try_delete_reaction(self, *, chat_id: int, message_id: int, reactor_id: int, emoji: str) -> bool:
         with self._connect() as con:
@@ -187,11 +225,13 @@ class PostgresRepository(Repository):
                     """
                     DELETE FROM reactions_log
                     WHERE chat_id=%s AND message_id=%s AND reactor_id=%s AND emoji=%s
+                    RETURNING 1
                     """,
                     (chat_id, message_id, reactor_id, emoji),
                 )
+                deleted = cur.fetchone() is not None
             con.commit()
-            return cur.rowcount == 1
+            return deleted
 
     # --- leaderboards ---
     def get_top(self, *, chat_id: int, limit: int) -> Sequence[TopRow]:

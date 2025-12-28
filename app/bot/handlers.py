@@ -31,11 +31,28 @@ def _emoji_key(reaction_obj) -> str:
       - unicode emoji -> "🔥"
       - custom -> "custom:<id>"
     """
-    if hasattr(reaction_obj, "emoji") and reaction_obj.emoji:
-        return str(reaction_obj.emoji)
-    if hasattr(reaction_obj, "custom_emoji_id") and reaction_obj.custom_emoji_id:
-        return f"custom:{reaction_obj.custom_emoji_id}"
-    return "unknown"
+    # None -> unknown
+    if reaction_obj is None:
+        return "unknown"
+
+    # If the update already gives us a plain string (common), use it directly
+    if isinstance(reaction_obj, str):
+        return reaction_obj
+
+    # Try known PTB object attributes
+    emoji = getattr(reaction_obj, "emoji", None)
+    if emoji:
+        return str(emoji)
+
+    custom_id = getattr(reaction_obj, "custom_emoji_id", None)
+    if custom_id:
+        return f"custom:{custom_id}"
+
+    # Fallback to string conversion (best-effort)
+    try:
+        return str(reaction_obj)
+    except Exception:
+        return "unknown"
 
 
 async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -167,6 +184,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo
         display_name=_display_name(user),
     )
     repo.upsert_user(identity)
+    logger.info("User upserted: chat=%s user=%s (%s)", chat.id, user.id, _display_name(user))
 
     created_ts = int(msg.date.timestamp()) if msg.date else 0
     circle = CircleMessage(
@@ -176,15 +194,29 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo
         created_at_ts=created_ts,
     )
 
-    inserted = repo.insert_circle_message(circle)
-    if not inserted:
-        # already processed (idempotent)
+    is_new_circle = repo.insert_circle_message(circle)
+    
+    # Get or verify the circle author (in case message was already processed)
+    author_id = repo.try_get_circle_author_id(chat_id=chat.id, message_id=msg.message_id)
+    if author_id is None:
+        logger.error("Circle not found in DB: chat=%s msg=%s", chat.id, msg.message_id)
         return
 
-    repo.add_circle_points(chat_id=chat.id, user_id=user.id, points=cfg.points_per_circle)
-    repo.set_last_circle_ts(chat_id=chat.id, ts=created_ts)
+    # Verify user was inserted before adding points
+    user_stats = repo.get_user_stats(chat_id=chat.id, user_id=author_id)
+    if not user_stats:
+        logger.error("Author not found after upsert! chat=%s user=%s. Cannot add points.", chat.id, author_id)
+        return
 
-    logger.info("Circle recorded chat=%s msg=%s author=%s", chat.id, msg.message_id, user.id)
+    # Only add points if this is a NEW circle (idempotent)
+    if is_new_circle:
+        repo.add_circle_points(chat_id=chat.id, user_id=author_id, points=cfg.points_per_circle)
+        logger.info("Circle points added: chat=%s user=%s points=%s (total points now: %s)", 
+                    chat.id, author_id, cfg.points_per_circle, user_stats.points + cfg.points_per_circle)
+        repo.set_last_circle_ts(chat_id=chat.id, ts=created_ts)
+        logger.info("Circle recorded chat=%s msg=%s author=%s", chat.id, msg.message_id, author_id)
+    else:
+        logger.info("Circle already processed: chat=%s msg=%s author=%s (no points added)", chat.id, msg.message_id, author_id)
 
 
 async def on_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -221,15 +253,27 @@ async def on_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, *, rep
     # Ensure author exists in users (can be missing if DB was reset mid-chat)
     # We cannot reliably fetch author identity here from update, so just ensure row exists if present.
     # (If missing, points update will affect 0 rows; acceptable, but you can add a "create placeholder" policy.)
+    logger.info(
+        "on_reaction: Processing deltas: added=%s removed=%s for author=%s",
+        list(delta.added), list(delta.removed), author_id,
+    )
+
     for emoji in delta.added:
-        if repo.try_insert_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji):
+        logger.info("on_reaction: Attempting to insert reaction: chat=%s msg=%s reactor=%s emoji=%s", chat_id, message_id, reactor.id, emoji)
+        inserted = repo.try_insert_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji)
+        logger.info("on_reaction: Insertion result: inserted=%s", inserted)
+        if inserted:
+            logger.info("on_reaction: Adding points for added reaction: chat=%s author=%s points=%s", chat_id, author_id, cfg.points_per_reaction)
             repo.add_reaction_points(chat_id=chat_id, user_id=author_id, points=cfg.points_per_reaction)
+        else:
+            logger.info("on_reaction: Reaction already existed, skipping points")
 
     for emoji in delta.removed:
-        if repo.try_delete_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji):
+        logger.info("on_reaction: Attempting to delete reaction: chat=%s msg=%s reactor=%s emoji=%s", chat_id, message_id, reactor.id, emoji)
+        deleted = repo.try_delete_reaction(chat_id=chat_id, message_id=message_id, reactor_id=reactor.id, emoji=emoji)
+        logger.info("on_reaction: Deletion result: deleted=%s", deleted)
+        if deleted:
+            logger.info("on_reaction: Removing points for removed reaction: chat=%s author=%s points=%s", chat_id, author_id, -cfg.points_per_reaction)
             repo.add_reaction_points(chat_id=chat_id, user_id=author_id, points=-cfg.points_per_reaction)
-
-    logger.info(
-        "Reaction delta chat=%s msg=%s reactor=%s author=%s added=%s removed=%s",
-        chat_id, message_id, reactor.id, author_id, list(delta.added), list(delta.removed),
-    )
+        else:
+            logger.info("on_reaction: Reaction didn't exist, skipping points removal")
