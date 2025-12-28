@@ -39,6 +39,7 @@ class ChatState:
     chat_id: int
     last_circle_ts: int
     last_rating_ts: int
+    ratings_enabled: bool
 
 
 @dataclass(frozen=True)

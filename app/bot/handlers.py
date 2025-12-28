@@ -6,6 +6,7 @@ from typing import Optional, List
 from telegram import Update, User
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
+from telegram.error import TelegramError
 
 from app.core.config import AppConfig
 from app.core.models import UserIdentity, CircleMessage
@@ -83,6 +84,38 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, cfg: 
         f"Top limit: {cfg.top_limit}"
     )
     await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+
+
+async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    chat = update.effective_chat
+    user = update.effective_user
+    if not chat or not user:
+        return False
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ("administrator", "creator")
+    except TelegramError:
+        return False
+
+
+async def cmd_enable_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    if not await _is_admin(update, context):
+        await update.effective_message.reply_text("Admins only.", parse_mode=cfg.parse_mode)
+        return
+
+    chat_id = update.effective_chat.id
+    repo.set_ratings_enabled(chat_id=chat_id, enabled=True)
+    await update.effective_message.reply_text("✅ Auto рейтинги включены.", parse_mode=cfg.parse_mode)
+
+
+async def cmd_disable_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
+    if not await _is_admin(update, context):
+        await update.effective_message.reply_text("Admins only.", parse_mode=cfg.parse_mode)
+        return
+
+    chat_id = update.effective_chat.id
+    repo.set_ratings_enabled(chat_id=chat_id, enabled=False)
+    await update.effective_message.reply_text("🛑 Auto рейтинги выключены.", parse_mode=cfg.parse_mode)
 
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:

@@ -112,6 +112,8 @@ python -m app.main
 	•	/top → top users (points/circles/reactions)
 	•	/me → your stats
 	•	/rules → current config values
+	•	/enable_ratings (admins only)
+	•	/disable_ratings (admins only)
 
 ⸻
 

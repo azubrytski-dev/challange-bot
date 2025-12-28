@@ -50,20 +50,25 @@ class SQLiteRepository(Repository):
     def ensure_chat_state(self, *, chat_id: int) -> None:
         with self._tx() as con:
             con.execute(
-                "INSERT OR IGNORE INTO chat_state(chat_id,last_circle_ts,last_rating_ts) VALUES(?,?,?)",
-                (chat_id, 0, 0),
+                "INSERT OR IGNORE INTO chat_state(chat_id,last_circle_ts,last_rating_ts,ratings_enabled) VALUES(?,?,?,?)",
+                (chat_id, 0, 0, 1),
             )
 
     def get_chat_state(self, *, chat_id: int) -> ChatState:
         self.ensure_chat_state(chat_id=chat_id)
         with self._connect() as con:
             row = con.execute(
-                "SELECT chat_id,last_circle_ts,last_rating_ts FROM chat_state WHERE chat_id=?",
+                "SELECT chat_id,last_circle_ts,last_rating_ts,ratings_enabled FROM chat_state WHERE chat_id=?",
                 (chat_id,),
             ).fetchone()
         if row is None:
-            return ChatState(chat_id=chat_id, last_circle_ts=0, last_rating_ts=0)
-        return ChatState(chat_id=row["chat_id"], last_circle_ts=row["last_circle_ts"], last_rating_ts=row["last_rating_ts"])
+            return ChatState(chat_id=chat_id, last_circle_ts=0, last_rating_ts=0, ratings_enabled=True)
+        return ChatState(
+            chat_id=row["chat_id"],
+            last_circle_ts=row["last_circle_ts"],
+            last_rating_ts=row["last_rating_ts"],
+            ratings_enabled=bool(row["ratings_enabled"]),
+        )
 
     def set_last_circle_ts(self, *, chat_id: int, ts: int) -> None:
         self.ensure_chat_state(chat_id=chat_id)
@@ -79,6 +84,14 @@ class SQLiteRepository(Repository):
         with self._connect() as con:
             rows = con.execute("SELECT chat_id FROM chat_state").fetchall()
         return [int(r["chat_id"]) for r in rows]
+
+    def set_ratings_enabled(self, *, chat_id: int, enabled: bool) -> None:
+        self.ensure_chat_state(chat_id=chat_id)
+        with self._tx() as con:
+            con.execute(
+                "UPDATE chat_state SET ratings_enabled=? WHERE chat_id=?",
+                (1 if enabled else 0, chat_id),
+            )
 
     # --- users ---
     def upsert_user(self, identity: UserIdentity) -> None:
