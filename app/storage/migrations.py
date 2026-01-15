@@ -226,7 +226,7 @@ def run_migrations(
     # Load and sort migration files, filtering by database type
     # Migration files should be named: {version}_{name}_{db_type}.sql
     # e.g., 001_initial_schema_sqlite.sql or 001_initial_schema_postgres.sql
-    pattern = f"*_{db_type}.sql"
+    pattern = f"[0-9]*_{db_type}.sql"
     migration_files = sorted(migrations_dir.glob(pattern))
     if not migration_files:
         logger.info("No migration files found in %s matching pattern %s", migrations_dir, pattern)
