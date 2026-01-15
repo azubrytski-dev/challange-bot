@@ -32,38 +32,82 @@ SupportedLocale = Literal["en", "ru"]
 # Translation dictionaries
 _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
     "en": {
-        MSG_NO_STATS: "No stats yet. Record a circle (video note) to join",
+        MSG_NO_STATS: "No numbers yet. Drop a circle (video note) and step into the cypher.",
         MSG_USER_STATS: "<b>{label}</b>\nPoints: <b>{points}</b>\nCircles: {circles}\nReactions: {reactions}",
-        MSG_RULES: "<b>Rules</b>\nCircle (video note): +{points_per_circle} point(s)\nReaction on a circle: +{points_per_reaction} point(s)\nAuto rating interval: {rating_interval_sec} sec\nZero criteria: {zero_criteria}\nZero ping limit: {zero_ping_limit}\nTop limit: {top_limit}",
-        MSG_ADMINS_ONLY: "Admins only.",
-        MSG_RATINGS_ENABLED: "Auto ratings enabled.",
-        MSG_RATINGS_DISABLED: "Auto ratings disabled.",
-        MSG_GREETING: "<b>Circles Ranking Bot</b>\nApplication started successfully!\n\nAvailable commands:\n  /top — top users\n  /me — your stats\n  /rules — config & rules\n  /enable_ratings — start auto ratings (admins)\n  /disable_ratings — stop auto ratings (admins)",
-        MSG_TOP_EMPTY: "No stats yet. Record a circle (video note) to start the game",
-        MSG_TOP_HEADER: "<b>Top</b>",
-        MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> pts · {circles} · {reactions}",
-        MSG_ZERO_PING: "<b>Side quest</b>: we need you on the board!\nCondition: <b>{reason}</b>\nPlayers: {mentions}\nDrop a circle and farm points",
+        MSG_RULES: (
+            "<b>House Rules</b>\n"
+            "Circle (video note): +{points_per_circle} point(s)\n"
+            "Reaction on a circle: +{points_per_reaction} point(s)\n"
+            "Auto rating interval: {rating_interval_sec} sec\n"
+            "Zero criteria: {zero_criteria}\n"
+            "Zero ping limit: {zero_ping_limit}\n"
+            "Top limit: {top_limit}"
+        ),
+        MSG_ADMINS_ONLY: "Hold up. Admins only handle this.",
+        MSG_RATINGS_ENABLED: "Auto ratings back on. Board stays hot.",
+        MSG_RATINGS_DISABLED: "Auto ratings paused. Silence before the drop.",
+        MSG_GREETING: (
+            "<b>Circles Ranking Bot</b>\n"
+            "Mic is live. Game is on.\n\n"
+            "Commands on deck:\n"
+            "  /top — who runs the board\n"
+            "  /me — your own numbers\n"
+            "  /rules — how points get made\n"
+            "  /enable_ratings — turn the board on (admins)\n"
+            "  /disable_ratings — kill the board (admins)"
+        ),
+        MSG_TOP_EMPTY: "Board’s clean. First circle sets the tone.",
+        MSG_TOP_HEADER: "<b>The Board</b>",
+        MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> pts : {circles} / {reactions}",
+        MSG_ZERO_PING: (
+            "<b>Callout</b>: still quiet over here.\n"
+            "Condition: <b>{reason}</b>\n"
+            "Names: {mentions}\n"
+            "Drop a circle. Make noise. Get on the board."
+        ),
         MSG_ZERO_POINTS: "0 points",
         MSG_ZERO_CIRCLES: "0 circles",
-        MSG_LANG_CHANGED: "Language changed to {language}.",
-        MSG_LANG_INVALID: "Invalid language code. Supported: en, ru",
+        MSG_LANG_CHANGED: "Language switched to {language}.",
+        MSG_LANG_INVALID: "Wrong code. Supported: en, ru",
     },
     "ru": {
-        MSG_NO_STATS: "Пока нет статистики. Запишите круг (видеосообщение), чтобы присоединиться",
-        MSG_USER_STATS: "<b>{label}</b>\Очки: <b>{points}</b>\Круги: {circles}\nРеакции: {reactions}",
-        MSG_RULES: "<b>Правила</b>\nКруг (видеосообщение): +{points_per_circle} очко(ов)\nРеакция на круг: +{points_per_reaction} очко(ов)\nИнтервал авто-рейтинга: {rating_interval_sec} сек\nКритерий нуля: {zero_criteria}\nЛимит упоминаний нуля: {zero_ping_limit}\nЛимит топа: {top_limit}",
-        MSG_ADMINS_ONLY: "Только для администраторов.",
-        MSG_RATINGS_ENABLED: "Авто-рейтинги включены.",
-        MSG_RATINGS_DISABLED: "Авто-рейтинги выключены.",
-        MSG_GREETING: "<b>Бот Рейтинга Кругов</b>\nПриложение успешно запущено!\n\Доступные команды:\n  /top — топ пользователей\n  /me — ваша статистика\n  /rules — конфиг и правила\n  /enable_ratings — запустить авто-рейтинги (админы)\n  /disable_ratings — остановить авто-рейтинги (админы)",
-        MSG_TOP_EMPTY: "Пока нет статистики. Запишите круг (видеосообщение), чтобы начать игру",
-        MSG_TOP_HEADER: "<b>Топ</b>",
-        MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> очков · {circles} · {reactions}",
-        MSG_ZERO_PING: "<b>Побочный квест</b>: вы нам нужны на доске!\nУсловие: <b>{reason}</b>\nИгроки: {mentions}\nЗапишите круг и зарабатывайте очки",
+        MSG_NO_STATS: "Пока пусто. Запиши круг и зайди в сайфер.",
+        MSG_USER_STATS: "<b>{label}</b>\nОчки: <b>{points}</b>\nКруги: {circles}\nРеакции: {reactions}",
+        MSG_RULES: (
+            "<b>Правила района</b>\n"
+            "Круг (видеосообщение): +{points_per_circle} очко(ов)\n"
+            "Реакция на круг: +{points_per_reaction} очко(ов)\n"
+            "Интервал авто-рейтинга: {rating_interval_sec} сек\n"
+            "Критерий нуля: {zero_criteria}\n"
+            "Лимит упоминаний: {zero_ping_limit}\n"
+            "Лимит топа: {top_limit}"
+        ),
+        MSG_ADMINS_ONLY: "Стоп. Только админы решают.",
+        MSG_RATINGS_ENABLED: "Авто-рейтинги включены. Доска в игре.",
+        MSG_RATINGS_DISABLED: "Авто-рейтинги на паузе. Перед битом тишина.",
+        MSG_GREETING: (
+            "<b>Бот Рейтинга Кругов</b>\n"
+            "Микрофон включён. Игра началась.\n\n"
+            "Команды:\n"
+            "  /top — кто держит верх\n"
+            "  /me — твои цифры\n"
+            "  /rules — как фармятся очки\n"
+            "  /enable_ratings — включить рейтинг (админы)\n"
+            "  /disable_ratings — выключить рейтинг (админы)"
+        ),
+        MSG_TOP_EMPTY: "Доска чистая. Первый круг задаёт ритм.",
+        MSG_TOP_HEADER: "<b>Лучшие MC по версии вселенной</b>",
+        MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> очков : {circles} / {reactions}",
+        MSG_ZERO_PING: (
+            "<b>Вызов</b>: тут пока тишина.\n"
+            "Условие: <b>{reason}</b>\n"
+            "Игроки: {mentions}\n"
+            "Записывай круг. Шуми. Залетай в топ."
+        ),
         MSG_ZERO_POINTS: "0 очков",
         MSG_ZERO_CIRCLES: "0 кругов",
-        MSG_LANG_CHANGED: "Язык изменён на {language}.",
-        MSG_LANG_INVALID: "Неверный код языка. Поддерживаются: en, ru",
+        MSG_LANG_CHANGED: "Язык переключён на {language}.",
+        MSG_LANG_INVALID: "Неверный код. Доступно: en, ru",
     },
 }
 
