@@ -1,16 +1,32 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional, Sequence, List
 import logging
 
 from app.core.models import UserIdentity, UserStats, TopRow, ChatState, CircleMessage
 from app.storage.repo import Repository
+from app.storage.migrations import PostgresMigrationRunner, run_migrations
 
 logger = logging.getLogger(__name__)
 
 
 class PostgresRepository(Repository):
-    def __init__(self, *, dsn: str, migrations_sql_path: str) -> None:
+    def __init__(
+        self,
+        *,
+        dsn: str,
+        migrations_dir: Path | str | None = None,
+        initial_schema_path: Path | str | None = None,
+    ) -> None:
+        """
+        Initialize PostgreSQL repository with migration support.
+
+        Args:
+            dsn: PostgreSQL connection string
+            migrations_dir: Directory containing migration SQL files (default: app/storage/migrations)
+            initial_schema_path: Optional path to initial schema SQL (for backward compatibility)
+        """
         # Import psycopg only when PostgreSQL repo is instantiated
         try:
             import psycopg
@@ -19,23 +35,39 @@ class PostgresRepository(Repository):
             raise ModuleNotFoundError(
                 "psycopg is not installed. Install it with: pip install 'psycopg[binary]>=3.1'"
             )
-        
+
         self._psycopg = psycopg
         self._dict_row = dict_row
         self._dsn = dsn
-        self._migrations_sql_path = migrations_sql_path
-        self._init_db()
+
+        # Set default migrations directory
+        if migrations_dir is None:
+            migrations_dir = Path(__file__).parent / "migrations"
+        elif isinstance(migrations_dir, str):
+            migrations_dir = Path(migrations_dir)
+
+        # Convert initial_schema_path to Path if provided
+        if initial_schema_path and isinstance(initial_schema_path, str):
+            initial_schema_path = Path(initial_schema_path)
+
+        self._init_db(migrations_dir=Path(migrations_dir), initial_schema_path=initial_schema_path)
 
     def _connect(self):
         return self._psycopg.connect(self._dsn, row_factory=self._dict_row)
 
-    def _init_db(self) -> None:
-        with open(self._migrations_sql_path, "r", encoding="utf-8") as f:
-            sql = f.read()
-        with self._connect() as con:
-            with con.cursor() as cur:
-                cur.execute(sql)
-            con.commit()
+    def _init_db(self, *, migrations_dir: Path, initial_schema_path: Path | None = None) -> None:
+        """Initialize database schema using migration system."""
+        con = self._connect()
+        try:
+            runner = PostgresMigrationRunner(con)
+            run_migrations(
+                runner=runner,
+                migrations_dir=migrations_dir,
+                initial_schema_path=initial_schema_path,
+                db_type="postgres",
+            )
+        finally:
+            con.close()
 
     # --- chat state ---
     def ensure_chat_state(self, *, chat_id: int) -> None:
@@ -43,11 +75,11 @@ class PostgresRepository(Repository):
             with con.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO chat_state(chat_id,last_circle_ts,last_rating_ts,ratings_enabled)
-                    VALUES(%s,%s,%s,%s)
+                    INSERT INTO chat_state(chat_id,last_circle_ts,last_rating_ts,ratings_enabled,language)
+                    VALUES(%s,%s,%s,%s,%s)
                     ON CONFLICT (chat_id) DO NOTHING
                     """,
-                    (chat_id, 0, 0, True),
+                    (chat_id, 0, 0, True, "en"),
                 )
             con.commit()
 
@@ -56,14 +88,17 @@ class PostgresRepository(Repository):
         with self._connect() as con:
             with con.cursor() as cur:
                 row = cur.execute(
-                    "SELECT chat_id,last_circle_ts,last_rating_ts,ratings_enabled FROM chat_state WHERE chat_id=%s",
+                    "SELECT chat_id,last_circle_ts,last_rating_ts,ratings_enabled,language FROM chat_state WHERE chat_id=%s",
                     (chat_id,),
                 ).fetchone()
+        # Handle missing language column for backward compatibility
+        language = row.get("language", "en") or "en"
         return ChatState(
             chat_id=row["chat_id"],
             last_circle_ts=row["last_circle_ts"],
             last_rating_ts=row["last_rating_ts"],
             ratings_enabled=bool(row["ratings_enabled"]),
+            language=language,
         )
 
     def set_last_circle_ts(self, *, chat_id: int, ts: int) -> None:
@@ -85,6 +120,21 @@ class PostgresRepository(Repository):
         with self._connect() as con:
             with con.cursor() as cur:
                 cur.execute("UPDATE chat_state SET ratings_enabled=%s WHERE chat_id=%s", (enabled, chat_id))
+            con.commit()
+
+    def get_chat_language(self, *, chat_id: int) -> str:
+        """Get the language preference for a chat. Returns 'en' if not set."""
+        state = self.get_chat_state(chat_id=chat_id)
+        return state.language
+
+    def set_chat_language(self, *, chat_id: int, language: str) -> None:
+        """Set the language preference for a chat. Validates language code."""
+        if language not in ("en", "ru"):
+            raise ValueError(f"Unsupported language: {language}. Supported: 'en', 'ru'")
+        self.ensure_chat_state(chat_id=chat_id)
+        with self._connect() as con:
+            with con.cursor() as cur:
+                cur.execute("UPDATE chat_state SET language=%s WHERE chat_id=%s", (language, chat_id))
             con.commit()
 
     def list_active_chats(self) -> Sequence[int]:
