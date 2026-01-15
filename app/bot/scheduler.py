@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def publish_rating_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Publish rating messages for all active chats."""
     app = context.application
     repo = context.job.data["repo"]
     cfg = context.job.data["cfg"]
@@ -28,12 +29,13 @@ async def publish_rating_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if st.last_circle_ts <= st.last_rating_ts:
             continue
 
+        locale = repo.get_chat_language(chat_id=chat_id)
         top = repo.get_top(chat_id=chat_id, limit=cfg.top_limit)
-        rating_text = format_top_message(top)
+        rating_text = format_top_message(top, locale=locale)
         await app.bot.send_message(chat_id=chat_id, text=rating_text, parse_mode=cfg.parse_mode)
 
         zero_users = repo.get_zero_users(chat_id=chat_id, criteria=cfg.zero_criteria, limit=cfg.zero_ping_limit)
-        zero_text = format_zero_ping_message(zero_users, criteria=cfg.zero_criteria)
+        zero_text = format_zero_ping_message(zero_users, criteria=cfg.zero_criteria, locale=locale)
         if zero_text:
             await app.bot.send_message(chat_id=chat_id, text=zero_text, parse_mode=cfg.parse_mode)
 
@@ -62,12 +64,13 @@ async def rating_scheduler_loop(*, app: Application, repo: Repository, cfg: AppC
                 if st.last_circle_ts <= st.last_rating_ts:
                     continue
 
+                locale = repo.get_chat_language(chat_id=chat_id)
                 top = repo.get_top(chat_id=chat_id, limit=cfg.top_limit)
-                rating_text = format_top_message(top)
+                rating_text = format_top_message(top, locale=locale)
                 await app.bot.send_message(chat_id=chat_id, text=rating_text, parse_mode=cfg.parse_mode)
 
                 zero_users = repo.get_zero_users(chat_id=chat_id, criteria=cfg.zero_criteria, limit=cfg.zero_ping_limit)
-                zero_text = format_zero_ping_message(zero_users, criteria=cfg.zero_criteria)
+                zero_text = format_zero_ping_message(zero_users, criteria=cfg.zero_criteria, locale=locale)
                 if zero_text:
                     await app.bot.send_message(chat_id=chat_id, text=zero_text, parse_mode=cfg.parse_mode)
 
