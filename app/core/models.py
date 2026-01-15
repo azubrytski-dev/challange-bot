@@ -36,10 +36,12 @@ class TopRow:
 
 @dataclass(frozen=True)
 class ChatState:
+    """Chat state including rating timestamps, enabled status, and language preference."""
     chat_id: int
     last_circle_ts: int
     last_rating_ts: int
     ratings_enabled: bool
+    language: str = "en"
 
 
 @dataclass(frozen=True)

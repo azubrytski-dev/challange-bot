@@ -19,11 +19,55 @@ A Telegram group/supergroup bot that:
 
 ## Requirements
 - Python **3.10+** (recommended 3.12)
+- [uv](https://github.com/astral-sh/uv) - Modern Python package manager
 - A Telegram bot token from **@BotFather**
 - The bot must be added to a **Group/Supergroup** and made **Admin** (required to receive reaction updates)
- - The bot must be added to a **Group/Supergroup** and made **Admin** (required to receive reaction updates)
- - PostgreSQL is optional for production use when `DB_URL` points to a Postgres server
- - If using PostgreSQL, ensure `psycopg[binary]>=3.1` is installed (add to `requirements.txt` or install separately)
+- PostgreSQL is optional for production use when `DB_URL` points to a Postgres server
+
+---
+
+## Modern Development Setup
+
+This project uses **uv** for fast, reliable Python package management and virtual environment handling.
+
+### Installation
+```bash
+# Install uv (one-time)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and setup project
+git clone <repository-url>
+cd freestyle-challenge
+
+# Install all dependencies (creates virtual environment automatically)
+uv sync
+```
+
+### Running the Bot
+```bash
+# Start the bot (automatically loads .env)
+uv run python -m app.main
+
+# Stop with Ctrl+C
+```
+
+### Development Commands
+```bash
+# Add new dependency
+uv add package-name
+
+# Update all dependencies
+uv sync --upgrade
+
+# Rebuild from scratch
+uv sync --reinstall
+
+# Run tests (when implemented)
+uv run pytest
+
+# Run with different Python version
+uv sync --python 3.11
+```
 
 ---
 
@@ -44,8 +88,8 @@ repo/
 			sqlite_repo.py
 			pg_repo.py
 			migrations.sql
-	main.py
-	requirements.txt
+	pyproject.toml
+	uv.lock
 	.env.example
 	README.md
 
@@ -61,19 +105,18 @@ source .venv/bin/activate
 ```
 
 ### 2) Install dependencies
-Create `requirements.txt` in repo root (example):
-```
-python-telegram-bot>=21.0
-# optional (PostgreSQL): psycopg[binary]>=3.1
-```
 
-Install runtime dependencies:
+Dependencies are managed with [uv](https://github.com/astral-sh/uv) and `pyproject.toml`:
 
 ```bash
-pip install -r requirements.txt
-# If you plan to use PostgreSQL and `psycopg` isn't already in requirements:
-pip install "psycopg[binary]>=3.1"
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
 ```
+
+**Note**: uv automatically creates and manages the virtual environment for you.
 
 ### 3) Create .env
 Copy example:
@@ -102,14 +145,15 @@ mkdir -p data
 
 ### 5) Run the bot (polling)
 
-Load env and run:
+```bash
+# With uv (recommended - automatically loads .env)
+uv run python -m app.main
 
-macOS/Linux
-
-set -a
-source .env
-set +a
+# Or with traditional Python
+source .venv/bin/activate
+set -a && source .env && set +a
 python -m app.main
+```
 
 
 ⸻
@@ -180,18 +224,85 @@ rm -f data/bot.db
 
 Then rerun; schema will be created automatically from app/storage/migrations.sql.
 
-⸻
+---
+
+## Advanced Troubleshooting
+
+### Environment & Dependencies
+```bash
+# Check if BOT_TOKEN is loaded
+uv run python -c "import os; print('BOT_TOKEN:', 'SET' if os.getenv('BOT_TOKEN') else 'MISSING')"
+
+# Test Telegram API connection
+uv run python -c "from telegram import Bot; import asyncio; asyncio.run(Bot(os.getenv('BOT_TOKEN')).get_me())"
+
+# Clear cache and reinstall dependencies
+uv cache clean
+uv sync --reinstall
+
+# Check installed packages
+uv pip list
+```
+
+### Database Issues
+```bash
+# Test SQLite connection
+uv run python -c "import sqlite3; sqlite3.connect('data/test.db').close(); print('SQLite OK')"
+
+# Test PostgreSQL connection (if using)
+uv run python -c "import psycopg; psycopg.connect(os.getenv('DB_URL')).close(); print('PostgreSQL OK')"
+
+# Reset database
+rm -f data/bot.db
+```
+
+### Permission & Telegram Issues
+- Ensure the bot is **Administrator** in your Telegram group
+- Check that `ADMIN_CHAT_ID` is set correctly for startup messages
+- Verify bot has permission to send messages and reactions
+
+---
+
+## Recent Improvements
+
+### v1.1 - Modern Python Tooling (January 2026)
+- ✅ **Migrated to uv**: Fast, reliable package management replacing pip
+- ✅ **pyproject.toml**: Modern dependency management with reproducible builds
+- ✅ **Automatic .env loading**: Added python-dotenv for seamless configuration
+- ✅ **Updated Dockerfile**: Uses uv for faster container builds
+- ✅ **Cleanup**: Removed legacy files (requirements.txt, old scripts)
+- ✅ **Enhanced documentation**: Comprehensive setup and troubleshooting guides
+
+### Planned Features
+- 🌟 **Bot Mechanic V1**: Themed messages with images and AI-generated content
+- 🌍 **Multi-language Support**: Russian/English localization system
+- 📊 **Enhanced Analytics**: Better tracking and reporting features
+
+---
 
 ## Optional: Docker run
 Dockerfile (repo root)
+```dockerfile
 FROM python:3.12-slim
-WORKDIR /app
-COPY . /app
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml .
+
+# Install dependencies using uv
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Copy source code
+COPY . .
 
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "app.main"]
+
+CMD ["uv", "run", "python", "-m", "app.main"]
+```
 
 docker-compose.yml (repo root)
 

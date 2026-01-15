@@ -3,10 +3,12 @@ from __future__ import annotations
 import os
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Optional, Sequence, List
 
 from app.core.models import UserIdentity, UserStats, TopRow, ChatState, CircleMessage
 from app.storage.repo import Repository
+from app.storage.migrations import SQLiteMigrationRunner, run_migrations
 
 
 def _ensure_dir(path: str) -> None:
@@ -16,11 +18,35 @@ def _ensure_dir(path: str) -> None:
 
 
 class SQLiteRepository(Repository):
-    def __init__(self, *, db_path: str, migrations_sql_path: str) -> None:
+    def __init__(
+        self,
+        *,
+        db_path: str,
+        migrations_dir: Path | str | None = None,
+        initial_schema_path: Path | str | None = None,
+    ) -> None:
+        """
+        Initialize SQLite repository with migration support.
+
+        Args:
+            db_path: Path to SQLite database file
+            migrations_dir: Directory containing migration SQL files (default: app/storage/migrations)
+            initial_schema_path: Optional path to initial schema SQL (for backward compatibility)
+        """
         _ensure_dir(db_path)
         self._db_path = db_path
-        self._migrations_sql_path = migrations_sql_path
-        self._init_db()
+
+        # Set default migrations directory
+        if migrations_dir is None:
+            migrations_dir = Path(__file__).parent / "migrations"
+        elif isinstance(migrations_dir, str):
+            migrations_dir = Path(migrations_dir)
+
+        # Convert initial_schema_path to Path if provided
+        if initial_schema_path and isinstance(initial_schema_path, str):
+            initial_schema_path = Path(initial_schema_path)
+
+        self._init_db(migrations_dir=Path(migrations_dir), initial_schema_path=initial_schema_path)
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self._db_path, timeout=30)
@@ -28,11 +54,19 @@ class SQLiteRepository(Repository):
         con.execute("PRAGMA foreign_keys = ON;")
         return con
 
-    def _init_db(self) -> None:
-        with open(self._migrations_sql_path, "r", encoding="utf-8") as f:
-            sql = f.read()
-        with self._connect() as con:
-            con.executescript(sql)
+    def _init_db(self, *, migrations_dir: Path, initial_schema_path: Path | None = None) -> None:
+        """Initialize database schema using migration system."""
+        con = self._connect()
+        try:
+            runner = SQLiteMigrationRunner(con)
+            run_migrations(
+                runner=runner,
+                migrations_dir=migrations_dir,
+                initial_schema_path=initial_schema_path,
+                db_type="sqlite",
+            )
+        finally:
+            con.close()
 
     @contextmanager
     def _tx(self):
@@ -50,24 +84,31 @@ class SQLiteRepository(Repository):
     def ensure_chat_state(self, *, chat_id: int) -> None:
         with self._tx() as con:
             con.execute(
-                "INSERT OR IGNORE INTO chat_state(chat_id,last_circle_ts,last_rating_ts,ratings_enabled) VALUES(?,?,?,?)",
-                (chat_id, 0, 0, 1),
+                "INSERT OR IGNORE INTO chat_state(chat_id,last_circle_ts,last_rating_ts,ratings_enabled,language) VALUES(?,?,?,?,?)",
+                (chat_id, 0, 0, 1, "en"),
             )
 
     def get_chat_state(self, *, chat_id: int) -> ChatState:
         self.ensure_chat_state(chat_id=chat_id)
         with self._connect() as con:
             row = con.execute(
-                "SELECT chat_id,last_circle_ts,last_rating_ts,ratings_enabled FROM chat_state WHERE chat_id=?",
+                "SELECT chat_id,last_circle_ts,last_rating_ts,ratings_enabled,language FROM chat_state WHERE chat_id=?",
                 (chat_id,),
             ).fetchone()
         if row is None:
-            return ChatState(chat_id=chat_id, last_circle_ts=0, last_rating_ts=0, ratings_enabled=True)
+            return ChatState(chat_id=chat_id, last_circle_ts=0, last_rating_ts=0, ratings_enabled=True, language="en")
+        # Handle missing language column for backward compatibility
+        language = "en"
+        try:
+            language = row["language"] or "en"
+        except (KeyError, IndexError):
+            pass  # Column doesn't exist in old schema, use default
         return ChatState(
             chat_id=row["chat_id"],
             last_circle_ts=row["last_circle_ts"],
             last_rating_ts=row["last_rating_ts"],
             ratings_enabled=bool(row["ratings_enabled"]),
+            language=language,
         )
 
     def set_last_circle_ts(self, *, chat_id: int, ts: int) -> None:
@@ -91,6 +132,22 @@ class SQLiteRepository(Repository):
             con.execute(
                 "UPDATE chat_state SET ratings_enabled=? WHERE chat_id=?",
                 (1 if enabled else 0, chat_id),
+            )
+
+    def get_chat_language(self, *, chat_id: int) -> str:
+        """Get the language preference for a chat. Returns 'en' if not set."""
+        state = self.get_chat_state(chat_id=chat_id)
+        return state.language
+
+    def set_chat_language(self, *, chat_id: int, language: str) -> None:
+        """Set the language preference for a chat. Validates language code."""
+        if language not in ("en", "ru"):
+            raise ValueError(f"Unsupported language: {language}. Supported: 'en', 'ru'")
+        self.ensure_chat_state(chat_id=chat_id)
+        with self._tx() as con:
+            con.execute(
+                "UPDATE chat_state SET language=? WHERE chat_id=?",
+                (language, chat_id),
             )
 
     # --- users ---

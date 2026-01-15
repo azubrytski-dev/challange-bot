@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freestyle-challenge"
+version = "0.1.0"
+description = "Telegram bot for freestyle challenges"
+requires-python = ">=3.9"
+dependencies = [
+    "python-telegram-bot[job-queue]>=21.0",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0.0"
+]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[project.scripts]
+circles-bot = "app.main:main"

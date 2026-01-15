@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class AppConfig:
 
     @staticmethod
     def from_env() -> "AppConfig":
+        load_dotenv()  # Load .env file
         bot_token = os.getenv("BOT_TOKEN", "").strip()
         if not bot_token:
             raise RuntimeError("BOT_TOKEN is required.")

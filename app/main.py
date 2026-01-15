@@ -15,7 +15,18 @@ from telegram.ext import (
 from app.core.config import AppConfig
 from app.storage.sqlite_repo import SQLiteRepository
 from app.storage.pg_repo import PostgresRepository
-from app.bot.handlers import cmd_top, cmd_me, cmd_rules, on_message, on_reaction, cmd_enable_ratings, cmd_disable_ratings, send_greeting
+from app.storage.repo import Repository
+from app.bot.handlers import (
+    cmd_top,
+    cmd_me,
+    cmd_rules,
+    on_message,
+    on_reaction,
+    cmd_enable_ratings,
+    cmd_disable_ratings,
+    cmd_lang,
+    send_greeting,
+)
 from app.bot.scheduler import publish_rating_job
 
 
@@ -44,18 +55,23 @@ def _build_repo(cfg: AppConfig):
         logger.info("Using PostgreSQL repository: %s", cfg.db_url)
         return PostgresRepository(
             dsn=cfg.db_url,
-            migrations_sql_path="app/storage/mg_postgre_init.sql",
+            # Migration system will handle schema initialization
+            # For existing production databases, run setup_production_migration_log_postgres.sql first
         )
 
     # Default to SQLite
     logger.info("Using SQLite repository: %s", cfg.db_url)
     db_path = _sqlite_path_from_db_url(cfg.db_url)
-    return SQLiteRepository(db_path=db_path, migrations_sql_path="app/storage/mg_sqllite_init.sql")
+    return SQLiteRepository(
+        db_path=db_path,
+        # Migration system will handle schema initialization
+        # For existing production databases, run setup_production_migration_log_sqlite.sql first
+    )
 
 
-async def _post_init(app: Application, *, repo: SQLiteRepository, cfg: AppConfig) -> None:
+async def _post_init(app: Application, *, repo: Repository, cfg: AppConfig) -> None:
     # Send greeting message on startup
-    await send_greeting(app, cfg)
+    await send_greeting(app, cfg, repo=repo)
 
     # Schedule periodic rating publishing using PTB JobQueue (no create_task warning)
     app.job_queue.run_repeating(
@@ -76,9 +92,10 @@ def build_app(*, cfg: AppConfig) -> Application:
     # Commands
     application.add_handler(CommandHandler("top", lambda u, c: cmd_top(u, c, repo=repo, cfg=cfg)))
     application.add_handler(CommandHandler("me", lambda u, c: cmd_me(u, c, repo=repo, cfg=cfg)))
-    application.add_handler(CommandHandler("rules", lambda u, c: cmd_rules(u, c, cfg=cfg)))
+    application.add_handler(CommandHandler("rules", lambda u, c: cmd_rules(u, c, repo=repo, cfg=cfg)))
     application.add_handler(CommandHandler("enable_ratings", lambda u, c: cmd_enable_ratings(u, c, repo=repo, cfg=cfg)))
     application.add_handler(CommandHandler("disable_ratings", lambda u, c: cmd_disable_ratings(u, c, repo=repo, cfg=cfg)))
+    application.add_handler(CommandHandler("lang", lambda u, c: cmd_lang(u, c, repo=repo, cfg=cfg)))
 
     # Circle messages (video_note)
     application.add_handler(
