@@ -1,0 +1,85 @@
+---
+alwaysApply: true
+---
+## Recommended Repository Layout
+
+# Clean Python Project Structure (Production-Grade)
+
+Audience: senior engineers.
+Goal: predictable imports, testability, maintainability, and “boring” production behavior.
+
+---
+
+## Principles
+
+1. **Use `src/` layout** to prevent accidental imports from the working directory.
+2. **Package-first**, not “scripts-first”.
+3. **Explicit boundaries**: domain logic separate from IO/framework code.
+4. **Typed public APIs** + linting/formatting as a gate (ruff + mypy/pyright).
+5. **Tests mirror the package** and include unit + integration layers.
+6. **Configuration is layered**: defaults → file → env → CLI overrides.
+7. **Entrypoints are explicit** (console scripts), not `python somefile.py`.
+
+---
+
+## Recommended Repository Layout
+
+> Works for CLIs, workers, and services.
+
+my_project/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── .gitignore
+├── .env.example
+├── .python-version                  # optional (pyenv/asdf)
+├── ruff.toml                        # optional (can live in pyproject)
+├── mypy.ini                         # optional (can live in pyproject)
+│
+├── src/
+│   └── my_project/
+│       ├── init.py
+│       ├── main.py              # optional: python -m my_project
+│       │
+│       ├── cli.py                   # Typer/Click entry (if CLI app)
+│       ├── main.py                  # runtime bootstrap (if service/worker)
+│       │
+│       ├── config/
+│       │   ├── init.py
+│       │   ├── settings.py          # Pydantic Settings / config schema
+│       │   └── logging.py           # logging configuration
+│       │
+│       ├── domain/
+│       │   ├── init.py
+│       │   ├── models.py            # dataclasses / pydantic models
+│       │   ├── rules.py             # pure business logic
+│       │   └── errors.py            # domain exceptions
+│       │
+│       ├── application/
+│       │   ├── init.py
+│       │   ├── services.py          # orchestration/use-cases
+│       │   └── ports.py             # Protocols (interfaces) for IO
+│       │
+│       ├── infrastructure/
+│       │   ├── init.py
+│       │   ├── db/
+│       │   │   ├── init.py
+│       │   │   ├── sqlite.py        # sqlite repo implementation
+│       │   │   └── migrations.py    # lightweight migrations
+│       │   ├── fs/
+│       │   │   ├── init.py
+│       │   │   ├── watcher.py       # watchfiles/watchdog integration
+│       │   │   └── mover.py         # atomic move/copy utilities
+│       │   └── http/
+│       │       ├── init.py
+│       │       └── client.py        # optional external HTTP client
+│       │
+│       └── observability/
+│           ├── init.py
+│           └── logging.py           # structured logging helpers
+│
+├── tests/
+│   ├── conftest.py                  # shared pytest fixtures
+│   ├── unit/
+│   │   ├── test_rules.py
+│   │   └── test_services.py
