@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 
@@ -61,3 +62,37 @@ class AppConfig:
             top_limit=_int("TOP_LIMIT", 10),
             admin_chat_id=_int("ADMIN_CHAT_ID", 0),
         )
+
+
+def get_app_version() -> str:
+    """
+    Get application version from pyproject.toml.
+    
+    Returns:
+        Version string (e.g., "0.1.0")
+    """
+    try:
+        # Try to get version from installed package metadata first
+        try:
+            from importlib.metadata import version
+            return version("freestyle-challenge")
+        except Exception:
+            pass
+        
+        # Fallback: parse pyproject.toml directly
+        project_root = Path(__file__).parent.parent.parent
+        pyproject_path = project_root / "pyproject.toml"
+        
+        if pyproject_path.exists():
+            with open(pyproject_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("version ="):
+                        # Extract version from: version = "0.1.0"
+                        version_str = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        return version_str
+        
+        # Final fallback
+        return "unknown"
+    except Exception:
+        return "unknown"

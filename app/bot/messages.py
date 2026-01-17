@@ -36,34 +36,35 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
         MSG_USER_STATS: "<b>{label}</b>\nPoints: <b>{points}</b>\nCircles: {circles}\nReactions: {reactions}",
         MSG_RULES: (
             "<b>House Rules</b>\n"
+            "Rules are simple: drop circles, earn respect, climb the board.\n\n"
             "Circle (video note): +{points_per_circle} point(s)\n"
             "Reaction on a circle: +{points_per_reaction} point(s)\n"
-            "Auto rating interval: {rating_interval_sec} sec\n"
-            "Zero criteria: {zero_criteria}\n"
-            "Zero ping limit: {zero_ping_limit}\n"
-            "Top limit: {top_limit}"
+            "Board check & summary: every {rating_interval_sec} sec\n"
+            "Board size: top {top_limit}"
         ),
-        MSG_ADMINS_ONLY: "Hold up. Admins only handle this.",
-        MSG_RATINGS_ENABLED: "Auto ratings back on. Board stays hot.",
-        MSG_RATINGS_DISABLED: "Auto ratings paused. Silence before the drop.",
+        MSG_ADMINS_ONLY: "Hold up. Admins handle this move.",
+        MSG_RATINGS_ENABLED: "Board checks are back on. Numbers stay watched.",
+        MSG_RATINGS_DISABLED: "Board checks paused. Quiet before the next run.",
         MSG_GREETING: (
-            "<b>Circles Ranking Bot</b>\n"
-            "Mic is live. Game is on.\n\n"
-            "Commands on deck:\n"
-            "  /top — who runs the board\n"
+            "<b>My name is: The Notorious B.O.T.</b>\n"
+            "Mic is live. Cypher is open.\n\n"
+            "Rules are simple: drop circles, earn respect, climb the board.\n\n"
+            "Moves you can make:\n"
+            "  /top — who's on the board\n"
             "  /me — your own numbers\n"
-            "  /rules — how points get made\n"
-            "  /enable_ratings — turn the board on (admins)\n"
-            "  /disable_ratings — kill the board (admins)"
+            "  /rules — how the game works\n"
+            "  /enable_ratings — resume board checks (admins)\n"
+            "  /disable_ratings — pause board checks (admins)\n\n"
+            "<i>v{version}</i>"
         ),
-        MSG_TOP_EMPTY: "Board’s clean. First circle sets the tone.",
+        MSG_TOP_EMPTY: "Board’s empty. First circle sets the rhythm.",
         MSG_TOP_HEADER: "<b>The Board</b>",
         MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> pts : {circles} / {reactions}",
         MSG_ZERO_PING: (
-            "<b>Callout</b>: still quiet over here.\n"
-            "Condition: <b>{reason}</b>\n"
+            "<b>Callout</b>: still no noise here.\n"
+            "Reason: <b>{reason}</b>\n"
             "Names: {mentions}\n"
-            "Drop a circle. Make noise. Get on the board."
+            "Drop a circle. Make it count."
         ),
         MSG_ZERO_POINTS: "0 points",
         MSG_ZERO_CIRCLES: "0 circles",
@@ -71,38 +72,41 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
         MSG_LANG_INVALID: "Wrong code. Supported: en, ru",
     },
     "ru": {
-        MSG_NO_STATS: "Пока пусто. Запиши круг и зайди в сайфер.",
+        MSG_NO_STATS: "Пока пусто. Запиши круг и залетай в сайфер.",
         MSG_USER_STATS: "<b>{label}</b>\nОчки: <b>{points}</b>\nКруги: {circles}\nРеакции: {reactions}",
         MSG_RULES: (
             "<b>Правила района</b>\n"
+            "Всё просто: записывай круги, зарабатывай уважение района и выходи в топ.\n\n"
             "Круг (видеосообщение): +{points_per_circle} очко(ов)\n"
             "Реакция на круг: +{points_per_reaction} очко(ов)\n"
-            "Интервал авто-рейтинга: {rating_interval_sec} сек\n"
-            "Критерий нуля: {zero_criteria}\n"
-            "Лимит упоминаний: {zero_ping_limit}\n"
-            "Лимит топа: {top_limit}"
+            "Проверка доски и саммари: каждые {rating_interval_sec} сек\n"
+            "Размер доски: топ {top_limit}"
         ),
-        MSG_ADMINS_ONLY: "Стоп. Только админы решают.",
-        MSG_RATINGS_ENABLED: "Авто-рейтинги включены. Доска в игре.",
-        MSG_RATINGS_DISABLED: "Авто-рейтинги на паузе. Перед битом тишина.",
+        MSG_ADMINS_ONLY: "Стоп. Этот ход только для админов.",
+        MSG_RATINGS_ENABLED: "Проверка доски включена. Цифры под контролем.",
+        MSG_RATINGS_DISABLED: "Проверка доски на паузе. Тишина перед следующим заходом.",
         MSG_GREETING: (
-            "<b>Бот Рейтинга Кругов</b>\n"
-            "Микрофон включён. Игра началась.\n\n"
+            "<b>Хей. Я - The Notorious B.O.T.</b>\n"
+            "Микрофон включён. Сайфер открыт.\n\n"
+            "Cypher — это круг, где люди по очереди читают фристайл.\n"
+            "Без сцены. Без жюри. Только круг, ритм и уважение.\n\n"
+            "Всё просто: записывай круги, зарабатывай уважение района и выходи в топ.\n\n"
             "Команды:\n"
-            "  /top — кто держит верх\n"
+            "  /top — кто на доске\n"
             "  /me — твои цифры\n"
-            "  /rules — как фармятся очки\n"
-            "  /enable_ratings — включить рейтинг (админы)\n"
-            "  /disable_ratings — выключить рейтинг (админы)"
+            "  /rules — как тут всё работает\n"
+            "  /enable_ratings — включить проверку доски (админы)\n"
+            "  /disable_ratings — поставить на паузу (админы)\n\n"
+            "<i>v{version}</i>"
         ),
-        MSG_TOP_EMPTY: "Доска чистая. Первый круг задаёт ритм.",
-        MSG_TOP_HEADER: "<b>Лучшие MC по версии вселенной</b>",
+        MSG_TOP_EMPTY: "Доска пустая. Первый круг задаёт ритм.",
+        MSG_TOP_HEADER: "<b>Доска</b>",
         MSG_TOP_ROW: "{rank}. {label} — <b>{points}</b> очков : {circles} / {reactions}",
         MSG_ZERO_PING: (
-            "<b>Вызов</b>: тут пока тишина.\n"
-            "Условие: <b>{reason}</b>\n"
+            "<b>Вызов</b>: тут пока тихо.\n"
+            "Причина: <b>{reason}</b>\n"
             "Игроки: {mentions}\n"
-            "Записывай круг. Шуми. Залетай в топ."
+            "Запиши круг. Дай шум."
         ),
         MSG_ZERO_POINTS: "0 очков",
         MSG_ZERO_CIRCLES: "0 кругов",

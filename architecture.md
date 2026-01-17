@@ -4,6 +4,9 @@ app/
     scheduler.py         # periodic rating publisher
     formatting.py        # rating text + zero-ping text (HTML)
     messages.py          # message templates and localization
+    media_assets.py      # media asset constants and path helpers
+    media_send.py        # telegram media sending utilities
+    assets/              # image assets for bot messages
   core/
     config.py            # constants/env parsing
     scoring.py           # pure domain rules: apply_circle/apply_reaction_delta
