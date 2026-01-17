@@ -9,7 +9,7 @@ WORKDIR /app
 COPY pyproject.toml .
 
 # Install dependencies using uv
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --no-install-project --no-dev
 
 # Copy source code
 COPY . .
