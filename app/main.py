@@ -151,9 +151,6 @@ def main() -> None:
         drop_pending_updates=True,
         poll_interval=1.0,
         timeout=30,
-        read_timeout=30,
-        write_timeout=30,
-        connect_timeout=30,
         close_loop=False,
     )
 
