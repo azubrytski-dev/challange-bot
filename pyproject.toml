@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freestyle-challenge"
+version = "1.2.0"
+description = "Telegram bot for freestyle challenges"
+requires-python = ">=3.9"
+dependencies = [
+    "python-telegram-bot[job-queue]>=21.0",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0.0"
+]
+
+[tool.setuptools]
+# Auto-discover all packages (app, app.bot, app.core, app.storage)
+packages = { find = {} }
+
+[tool.setuptools.package-dir]
+"" = "."
+
+# Include package data (assets and migrations)
+[tool.setuptools.package-data]
+"app.bot" = ["assets/*.png"]
+"app.storage" = ["migrations/*.sql", "migrations/*.md"]
+
+[project.scripts]
+circles-bot = "app.main:main"

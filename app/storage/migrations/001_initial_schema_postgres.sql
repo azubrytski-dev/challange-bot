@@ -1,3 +1,5 @@
+-- Initial schema for PostgreSQL
+
 CREATE TABLE IF NOT EXISTS users (
   chat_id       BIGINT NOT NULL,
   user_id       BIGINT NOT NULL,
