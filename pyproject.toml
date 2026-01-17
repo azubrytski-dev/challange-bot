@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "freestyle-challenge"
 version = "1.2.0"
 description = "Telegram bot for freestyle challenges"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
-    "python-telegram-bot[job-queue]>=21.0",
-    "psycopg[binary]>=3.1",
+    "python-telegram-bot[job-queue]>=21.6,<22",
+    "psycopg[binary]>=3.2,<4",
     "python-dotenv>=1.0.0"
 ]
 
