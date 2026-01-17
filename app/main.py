@@ -26,6 +26,7 @@ from app.bot.handlers import (
     cmd_disable_ratings,
     cmd_lang,
     send_greeting,
+    on_error,
 )
 from app.bot.scheduler import publish_rating_job
 
@@ -107,6 +108,9 @@ def build_app(*, cfg: AppConfig) -> Application:
         MessageReactionHandler(lambda u, c: on_reaction(u, c, repo=repo, cfg=cfg))
     )
 
+    # Global error handler
+    application.add_error_handler(on_error)
+
     application.post_init = lambda app: _post_init(app, repo=repo, cfg=cfg)
 
     return application
@@ -118,6 +122,7 @@ def main() -> None:
     # Reduce verbosity for noisy third-party libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
 
     # Replace root handlers with one that redacts the bot token from output
     class RedactingFormatter(logging.Formatter):
@@ -140,9 +145,15 @@ def main() -> None:
 
     app = build_app(cfg=cfg)
 
-    # Polling mode
+    # Polling mode with explicit timeouts for better resilience
     app.run_polling(
         allowed_updates=list(cfg.allowed_updates),
+        drop_pending_updates=True,
+        poll_interval=1.0,
+        timeout=30,
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=30,
         close_loop=False,
     )
 
