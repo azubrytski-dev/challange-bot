@@ -131,8 +131,6 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo:
         points_per_circle=cfg.points_per_circle,
         points_per_reaction=cfg.points_per_reaction,
         rating_interval_sec=cfg.rating_interval_sec,
-        zero_criteria=cfg.zero_criteria,
-        zero_ping_limit=cfg.zero_ping_limit,
         top_limit=cfg.top_limit,
     )
     await send_themed_photo(

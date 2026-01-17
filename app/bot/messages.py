@@ -40,8 +40,6 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
             "Circle (video note): +{points_per_circle} point(s)\n"
             "Reaction on a circle: +{points_per_reaction} point(s)\n"
             "Board check & summary: every {rating_interval_sec} sec\n"
-            "Who’s off the board: {zero_criteria}\n"
-            "How many we call out at once: {zero_ping_limit}\n"
             "Board size: top {top_limit}"
         ),
         MSG_ADMINS_ONLY: "Hold up. Admins handle this move.",
@@ -81,8 +79,6 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
             "Круг (видеосообщение): +{points_per_circle} очко(ов)\n"
             "Реакция на круг: +{points_per_reaction} очко(ов)\n"
             "Проверка доски и саммари: каждые {rating_interval_sec} сек\n"
-            "Кто вне доски: {zero_criteria}\n"
-            "Сколько зовём за раз: {zero_ping_limit}\n"
             "Размер доски: топ {top_limit}"
         ),
         MSG_ADMINS_ONLY: "Стоп. Этот ход только для админов.",
