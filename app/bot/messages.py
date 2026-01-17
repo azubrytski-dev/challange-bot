@@ -50,11 +50,12 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
             "Mic is live. Cypher is open.\n\n"
             "Rules are simple: drop circles, earn respect, climb the board.\n\n"
             "Moves you can make:\n"
-            "  /top — who’s on the board\n"
+            "  /top — who's on the board\n"
             "  /me — your own numbers\n"
             "  /rules — how the game works\n"
             "  /enable_ratings — resume board checks (admins)\n"
-            "  /disable_ratings — pause board checks (admins)"
+            "  /disable_ratings — pause board checks (admins)\n\n"
+            "<i>v{version}</i>"
         ),
         MSG_TOP_EMPTY: "Board’s empty. First circle sets the rhythm.",
         MSG_TOP_HEADER: "<b>The Board</b>",
@@ -95,7 +96,8 @@ _TRANSLATIONS: dict[SupportedLocale, dict[str, str]] = {
             "  /me — твои цифры\n"
             "  /rules — как тут всё работает\n"
             "  /enable_ratings — включить проверку доски (админы)\n"
-            "  /disable_ratings — поставить на паузу (админы)"
+            "  /disable_ratings — поставить на паузу (админы)\n\n"
+            "<i>v{version}</i>"
         ),
         MSG_TOP_EMPTY: "Доска пустая. Первый круг задаёт ритм.",
         MSG_TOP_HEADER: "<b>Доска</b>",

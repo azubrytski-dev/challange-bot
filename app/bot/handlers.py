@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 from telegram.error import TelegramError
 
-from app.core.config import AppConfig
+from app.core.config import AppConfig, get_app_version
 from app.core.models import UserIdentity, CircleMessage
 from app.core.scoring import compute_reaction_delta
 from app.storage.repo import Repository
@@ -204,7 +204,8 @@ async def send_greeting(app, cfg: AppConfig, *, repo: Repository) -> None:
             except Exception:
                 pass  # Fallback to English if chat doesn't exist yet
 
-        greeting_text = get_message(MSG_GREETING, locale=locale)
+        version = get_app_version()
+        greeting_text = get_message(MSG_GREETING, locale=locale, version=version)
         await send_themed_photo(
             bot=app.bot,
             chat_id=cfg.admin_chat_id,
