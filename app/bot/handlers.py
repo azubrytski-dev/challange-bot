@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 TELEGRAM_CAPTION_MAX_LENGTH = 1024
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Global error handler to catch and log unhandled exceptions."""
+    logger.exception("Unhandled error. Update=%r", update, exc_info=context.error)
+
+
 def _display_name(u: User) -> str:
     name = (u.full_name or "").strip()
     return name if name else (u.first_name or "User")
