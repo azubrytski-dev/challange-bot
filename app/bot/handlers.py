@@ -13,6 +13,7 @@ from app.core.models import UserIdentity, CircleMessage
 from app.core.scoring import compute_reaction_delta
 from app.storage.repo import Repository
 from app.bot.formatting import format_top_message
+from app.bot.media_send import send_themed_photo
 from app.bot.messages import (
     get_message,
     MSG_NO_STATS,
@@ -77,7 +78,13 @@ async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: R
     locale = repo.get_chat_language(chat_id=chat_id)
     rows = repo.get_top(chat_id=chat_id, limit=cfg.top_limit)
     text = format_top_message(rows, locale=locale)
-    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    await send_themed_photo(
+        bot=context.bot,
+        chat_id=chat_id,
+        asset_key="rating",
+        caption=text,
+        parse_mode=cfg.parse_mode,
+    )
 
 
 async def cmd_me(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -103,7 +110,13 @@ async def cmd_me(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Re
         circles=stats.circles,
         reactions=stats.reactions,
     )
-    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    await send_themed_photo(
+        bot=context.bot,
+        chat_id=chat_id,
+        asset_key="me",
+        caption=text,
+        parse_mode=cfg.parse_mode,
+    )
 
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -122,7 +135,13 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo:
         zero_ping_limit=cfg.zero_ping_limit,
         top_limit=cfg.top_limit,
     )
-    await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    await send_themed_photo(
+        bot=context.bot,
+        chat_id=chat_id,
+        asset_key="info_event",
+        caption=text,
+        parse_mode=cfg.parse_mode,
+    )
 
 
 async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -188,7 +207,13 @@ async def send_greeting(app, cfg: AppConfig, *, repo: Repository) -> None:
                 pass  # Fallback to English if chat doesn't exist yet
 
         greeting_text = get_message(MSG_GREETING, locale=locale)
-        await app.bot.send_message(chat_id=cfg.admin_chat_id, text=greeting_text, parse_mode=cfg.parse_mode)
+        await send_themed_photo(
+            bot=app.bot,
+            chat_id=cfg.admin_chat_id,
+            asset_key="greeting",
+            caption=greeting_text,
+            parse_mode=cfg.parse_mode,
+        )
         logger.info("✅ Application started. Greeting sent to admin chat %s.", cfg.admin_chat_id)
     except Exception as e:
         logger.warning("Failed to send greeting to admin chat %s: %s", cfg.admin_chat_id, e)
