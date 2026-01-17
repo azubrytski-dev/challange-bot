@@ -29,6 +29,9 @@ from app.bot.messages import (
 
 logger = logging.getLogger(__name__)
 
+# Telegram photo caption limit (characters)
+TELEGRAM_CAPTION_MAX_LENGTH = 1024
+
 
 def _display_name(u: User) -> str:
     name = (u.full_name or "").strip()
@@ -78,13 +81,17 @@ async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: R
     locale = repo.get_chat_language(chat_id=chat_id)
     rows = repo.get_top(chat_id=chat_id, limit=cfg.top_limit)
     text = format_top_message(rows, locale=locale)
-    await send_themed_photo(
-        bot=context.bot,
-        chat_id=chat_id,
-        asset_key="rating",
-        caption=text,
-        parse_mode=cfg.parse_mode,
-    )
+
+    if len(text) > TELEGRAM_CAPTION_MAX_LENGTH:
+        await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    else:
+        await send_themed_photo(
+            bot=context.bot,
+            chat_id=chat_id,
+            asset_key="rating",
+            caption=text,
+            parse_mode=cfg.parse_mode,
+        )
 
 
 async def cmd_me(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -110,13 +117,17 @@ async def cmd_me(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Re
         circles=stats.circles,
         reactions=stats.reactions,
     )
-    await send_themed_photo(
-        bot=context.bot,
-        chat_id=chat_id,
-        asset_key="me",
-        caption=text,
-        parse_mode=cfg.parse_mode,
-    )
+
+    if len(text) > TELEGRAM_CAPTION_MAX_LENGTH:
+        await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    else:
+        await send_themed_photo(
+            bot=context.bot,
+            chat_id=chat_id,
+            asset_key="me",
+            caption=text,
+            parse_mode=cfg.parse_mode,
+        )
 
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: Repository, cfg: AppConfig) -> None:
@@ -133,13 +144,17 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo:
         rating_interval_sec=cfg.rating_interval_sec,
         top_limit=cfg.top_limit,
     )
-    await send_themed_photo(
-        bot=context.bot,
-        chat_id=chat_id,
-        asset_key="info_event",
-        caption=text,
-        parse_mode=cfg.parse_mode,
-    )
+
+    if len(text) > TELEGRAM_CAPTION_MAX_LENGTH:
+        await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
+    else:
+        await send_themed_photo(
+            bot=context.bot,
+            chat_id=chat_id,
+            asset_key="info_event",
+            caption=text,
+            parse_mode=cfg.parse_mode,
+        )
 
 
 async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -196,23 +211,30 @@ async def send_greeting(app, cfg: AppConfig, *, repo: Repository) -> None:
         return
 
     try:
-        # Use English for admin greeting (or get from admin chat if it exists)
         locale = "en"
         if cfg.admin_chat_id:
             try:
                 locale = repo.get_chat_language(chat_id=cfg.admin_chat_id)
             except Exception:
-                pass  # Fallback to English if chat doesn't exist yet
+                pass
 
         version = get_app_version()
         greeting_text = get_message(MSG_GREETING, locale=locale, version=version)
-        await send_themed_photo(
-            bot=app.bot,
-            chat_id=cfg.admin_chat_id,
-            asset_key="greeting",
-            caption=greeting_text,
-            parse_mode=cfg.parse_mode,
-        )
+        
+        if len(greeting_text) > TELEGRAM_CAPTION_MAX_LENGTH:
+            await app.bot.send_message(
+                chat_id=cfg.admin_chat_id,
+                text=greeting_text,
+                parse_mode=cfg.parse_mode,
+            )
+        else:
+            await send_themed_photo(
+                bot=app.bot,
+                chat_id=cfg.admin_chat_id,
+                asset_key="greeting",
+                caption=greeting_text,
+                parse_mode=cfg.parse_mode,
+            )
         logger.info("✅ Application started. Greeting sent to admin chat %s.", cfg.admin_chat_id)
     except Exception as e:
         logger.warning("Failed to send greeting to admin chat %s: %s", cfg.admin_chat_id, e)
@@ -225,9 +247,7 @@ async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: 
     chat_id = update.effective_chat.id
     current_locale = repo.get_chat_language(chat_id=chat_id)
 
-    # Get language code from command arguments
     if not context.args or len(context.args) == 0:
-        # Show current language
         text = get_message(MSG_LANG_CHANGED, locale=current_locale, language=current_locale.upper())
         await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
         return
@@ -240,7 +260,6 @@ async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo: 
 
     try:
         repo.set_chat_language(chat_id=chat_id, language=language_code)
-        # Use new language for success message
         text = get_message(MSG_LANG_CHANGED, locale=language_code, language=language_code.upper())
         await update.effective_message.reply_text(text=text, parse_mode=cfg.parse_mode)
     except ValueError as e:
@@ -257,7 +276,6 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo
     if not msg or not chat or not user:
         return
 
-    # Only groups/supergroups (optional hard rule)
     if chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
         return
 
@@ -284,20 +302,17 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, repo
     )
 
     is_new_circle = repo.insert_circle_message(circle)
-    
-    # Get or verify the circle author (in case message was already processed)
+
     author_id = repo.try_get_circle_author_id(chat_id=chat.id, message_id=msg.message_id)
     if author_id is None:
         logger.error("Circle not found in DB: chat=%s msg=%s", chat.id, msg.message_id)
         return
 
-    # Verify user was inserted before adding points
     user_stats = repo.get_user_stats(chat_id=chat.id, user_id=author_id)
     if not user_stats:
         logger.error("Author not found after upsert! chat=%s user=%s. Cannot add points.", chat.id, author_id)
         return
 
-    # Only add points if this is a NEW circle (idempotent)
     if is_new_circle:
         repo.add_circle_points(chat_id=chat.id, user_id=author_id, points=cfg.points_per_circle)
         logger.info("Circle points added: chat=%s user=%s points=%s (total points now: %s)", 
@@ -333,15 +348,11 @@ async def on_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, *, rep
     if not reactor:
         return
 
-    # Normalize reaction sets
     old_set: List[str] = [_emoji_key(x.type) for x in (mr.old_reaction or [])]
     new_set: List[str] = [_emoji_key(x.type) for x in (mr.new_reaction or [])]
 
     delta = compute_reaction_delta(old_set=old_set, new_set=new_set)
 
-    # Ensure author exists in users (can be missing if DB was reset mid-chat)
-    # We cannot reliably fetch author identity here from update, so just ensure row exists if present.
-    # (If missing, points update will affect 0 rows; acceptable, but you can add a "create placeholder" policy.)
     logger.info(
         "on_reaction: Processing deltas: added=%s removed=%s for author=%s",
         list(delta.added), list(delta.removed), author_id,
