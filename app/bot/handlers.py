@@ -6,7 +6,7 @@ from typing import Optional, List
 from telegram import Update, User
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
-from telegram.error import TelegramError
+from telegram.error import TelegramError, Conflict
 
 from app.core.config import AppConfig, get_app_version
 from app.core.models import UserIdentity, CircleMessage
@@ -35,7 +35,19 @@ TELEGRAM_CAPTION_MAX_LENGTH = 1024
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Global error handler to catch and log unhandled exceptions."""
-    logger.exception("Unhandled error. Update=%r", update, exc_info=context.error)
+    error = context.error
+    
+    # Handle Conflict errors (multiple bot instances) more gracefully
+    if isinstance(error, Conflict):
+        logger.warning(
+            "Conflict: Another bot instance is polling the same token. "
+            "Ensure only one instance is running. Update=%r",
+            update
+        )
+        return
+
+    # For all other errors, log with full exception details
+    logger.exception("Unhandled error. Update=%r", update, exc_info=error)
 
 
 def _display_name(u: User) -> str:
