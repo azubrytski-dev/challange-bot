@@ -87,7 +87,7 @@ async def _post_init(app: Application, *, repo: Repository, cfg: AppConfig) -> N
     app.job_queue.run_daily(
         callback=weekly_reset_job,
         time=time(hour=23, minute=59, tzinfo=timezone.utc),
-        days=(6,),
+        days=(0,),
         data={"repo": repo, "cfg": cfg},
         name="weekly_reset_scheduler",
     )
