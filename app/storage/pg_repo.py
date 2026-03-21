@@ -311,6 +311,42 @@ class PostgresRepository(Repository):
             for i, r in enumerate(rows, start=1)
         ]
 
+
+    def get_top_user(self, *, chat_id: int) -> Optional[UserStats]:
+        with self._connect() as con:
+            with con.cursor() as cur:
+                row = cur.execute(
+                    """
+                    SELECT chat_id,user_id,username,display_name,circles,reactions,points
+                    FROM users
+                    WHERE chat_id=%s
+                    ORDER BY points DESC, circles DESC, reactions DESC, user_id ASC
+                    LIMIT 1
+                    """,
+                    (chat_id,),
+                ).fetchone()
+        if not row:
+            return None
+        return UserStats(**row)
+
+    def increment_weekly_wins(self, *, chat_id: int, user_id: int) -> None:
+        with self._connect() as con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET weekly_wins=weekly_wins+1 WHERE chat_id=%s AND user_id=%s",
+                    (chat_id, user_id),
+                )
+            con.commit()
+
+    def reset_weekly_stats(self, *, chat_id: int) -> None:
+        with self._connect() as con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET points=0, circles=0, reactions=0 WHERE chat_id=%s",
+                    (chat_id,),
+                )
+            con.commit()
+
     def get_zero_users(self, *, chat_id: int, criteria: str, limit: int) -> Sequence[UserStats]:
         if criteria == "points":
             where = "points <= 0"

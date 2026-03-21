@@ -8,7 +8,7 @@ from telegram.ext import Application, ContextTypes
 
 from app.core.config import AppConfig
 from app.storage.repo import Repository
-from app.bot.formatting import format_top_message, format_zero_ping_message
+from app.bot.formatting import format_top_message, format_zero_ping_message, mention_user
 
 logger = logging.getLogger(__name__)
 
@@ -80,3 +80,29 @@ async def rating_scheduler_loop(*, app: Application, repo: Repository, cfg: AppC
             raise
         except Exception:
             logger.exception("Scheduler loop failure")
+
+
+async def weekly_reset_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reset weekly stats and track weekly winner for all active chats."""
+    app = context.application
+    repo = context.job.data["repo"]
+    cfg = context.job.data["cfg"]
+
+    chat_ids = repo.list_active_chats()
+    for chat_id in chat_ids:
+        winner = repo.get_top_user(chat_id=chat_id)
+        if winner is not None:
+            repo.increment_weekly_wins(chat_id=chat_id, user_id=winner.user_id)
+
+        repo.reset_weekly_stats(chat_id=chat_id)
+
+        if winner is not None:
+            winner_label = mention_user(winner.user_id, winner.display_name)
+            text = f"🏆 Weekly winner:\n{winner_label}\n\nRespect earned. New week, new board."
+            await app.bot.send_message(chat_id=chat_id, text=text, parse_mode=cfg.parse_mode)
+
+        logger.info(
+            "weekly_reset_job completed for chat_id=%s winner_user_id=%s",
+            chat_id,
+            getattr(winner, "user_id", None),
+        )

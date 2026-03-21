@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import time, timezone
 
 from telegram.ext import (
     Application,
@@ -28,7 +29,7 @@ from app.bot.handlers import (
     send_greeting,
     on_error,
 )
-from app.bot.scheduler import publish_rating_job
+from app.bot.scheduler import publish_rating_job, weekly_reset_job
 
 
 logging.basicConfig(
@@ -82,7 +83,15 @@ async def _post_init(app: Application, *, repo: Repository, cfg: AppConfig) -> N
         data={"repo": repo, "cfg": cfg},
         name="rating_scheduler",
     )
-    logger.info("Scheduler started. Interval=%s sec", cfg.rating_interval_sec)
+
+    app.job_queue.run_daily(
+        callback=weekly_reset_job,
+        time=time(hour=23, minute=59, tzinfo=timezone.utc),
+        days=(0,),
+        data={"repo": repo, "cfg": cfg},
+        name="weekly_reset_scheduler",
+    )
+    logger.info("Schedulers started. Rating interval=%s sec; weekly reset=Sunday 23:59 UTC", cfg.rating_interval_sec)
 
 
 def build_app(*, cfg: AppConfig) -> Application:

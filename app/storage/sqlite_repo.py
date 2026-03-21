@@ -259,6 +259,45 @@ class SQLiteRepository(Repository):
             )
         return top
 
+
+    def get_top_user(self, *, chat_id: int) -> Optional[UserStats]:
+        with self._connect() as con:
+            row = con.execute(
+                """
+                SELECT chat_id,user_id,username,display_name,circles,reactions,points
+                FROM users
+                WHERE chat_id=?
+                ORDER BY points DESC, circles DESC, reactions DESC, user_id ASC
+                LIMIT 1
+                """,
+                (chat_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return UserStats(
+            chat_id=row["chat_id"],
+            user_id=row["user_id"],
+            username=row["username"],
+            display_name=row["display_name"],
+            circles=row["circles"],
+            reactions=row["reactions"],
+            points=row["points"],
+        )
+
+    def increment_weekly_wins(self, *, chat_id: int, user_id: int) -> None:
+        with self._tx() as con:
+            con.execute(
+                "UPDATE users SET weekly_wins=weekly_wins+1 WHERE chat_id=? AND user_id=?",
+                (chat_id, user_id),
+            )
+
+    def reset_weekly_stats(self, *, chat_id: int) -> None:
+        with self._tx() as con:
+            con.execute(
+                "UPDATE users SET points=0, circles=0, reactions=0 WHERE chat_id=?",
+                (chat_id,),
+            )
+
     def get_zero_users(self, *, chat_id: int, criteria: str, limit: int) -> Sequence[UserStats]:
         if criteria == "points":
             where = "points <= 0"
